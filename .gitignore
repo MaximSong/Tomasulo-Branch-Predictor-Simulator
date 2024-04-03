@@ -1,0 +1,6 @@
+debug_outs/
+ref_outs/
+traces/
+*.sh
+*.pdf
+Makefile
