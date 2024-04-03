@@ -1,8 +1,18 @@
 #include "branchsim.hpp"
 #include <algorithm>
+unsigned long long history_table_size;
+unsigned long long pattern_table_size;
+unsigned long long *history_table;
+unsigned char *pattern_table;
 void yeh_patt_init_predictor(branchsim_conf_t *sim_conf) {
     // create history table of 2^H entries (all entries initialized to 0)
-
+    unsigned int H = sim_conf->H;
+    history_table_size = 1 << H;
+    unsigned long long *history_table = new unsigned long long[history_table_size]();
+    unsigned int P = sim_conf->P;
+    pattern_table_size = 1 << P;
+    unsigned char *pattern_table = new unsigned char[pattern_table_size]();
+    std::fill_n(pattern_table, pattern_table_size, 0b01);
     // create pattern table of 2^P entries init to weakly not taken
 
 #ifdef DEBUG
@@ -17,12 +27,14 @@ bool yeh_patt_predict(branch_t *br) {
 #endif
 
     // add your code here
-
-
+    unsigned long long history_index = br->ip & (history_table_size - 1);
+    unsigned long long pattern_index = history_table[history_index] & (pattern_table_size - 1);
+    bool prediction = pattern_table[pattern_index] >= 0b10;
+    
 #ifdef DEBUG
     printf("\t\tHT index: 0x%" PRIx64 ", History: 0x%" PRIx64 ", PT index: 0x%" PRIx64 ", Prediction: %d\n", 0ul, 0ul, 0ul, 0); // TODO: FIX ME
 #endif
-    return false; // TODO: FIX ME
+    return prediction; // TODO: FIX ME
 }
 
 void yeh_patt_update_predictor(branch_t *br) {
@@ -31,7 +43,17 @@ void yeh_patt_update_predictor(branch_t *br) {
 #endif
 
     // add your code here
+    unsigned long long history_index = (br->ip >> 2) & (history_table_size - 1);
+    unsigned long long history_value = (history_table[history_index] << 1) | (br->is_taken ? 1 : 0);
+    history_table[history_index] = history_value & (pattern_table_size - 1); // Update history
 
+    unsigned long long pattern_index = history_value & (pattern_table_size - 1);
+    // Update Smith counter in PT
+    if (br->is_taken) {
+        if (pattern_table[pattern_index] < 3) pattern_table[pattern_index]++;
+    } else {
+        if (pattern_table[pattern_index] > 0) pattern_table[pattern_index]--;
+    }
 #ifdef DEBUG
     printf("\t\tHT index: 0x%" PRIx64 ", History: 0x%" PRIx64 ", PT index: 0x%" PRIx64 ", New Counter: 0x%" PRIx64 ", New History: 0x%" PRIx64 "\n", 0ul, 0ul, 0ul, 0ul, 0ul); // TODO: FIX ME
 #endif
@@ -39,6 +61,8 @@ void yeh_patt_update_predictor(branch_t *br) {
 
 void yeh_patt_cleanup_predictor() {
     // add your code here
+    delete[] history_table;
+    delete[] pattern_table;
 }
 
 unsigned long long ghr = 0;
@@ -48,7 +72,7 @@ void gshare_init_predictor(branchsim_conf_t *sim_conf) {
     // create pattern table of 2^P entries init to weakly not taken
     unsigned int P = sim_conf->P;
     ghr = 0;
-    unsigned long long pattern_table_size = 1 << P;
+    pattern_table_size = 1 << P;
     unsigned long long *pattern_table = new unsigned long long[pattern_table_size];
     std::fill_n(pattern_table, pattern_table_size, 0b01); // initialize pattern table to weakly not taken
 
@@ -112,7 +136,15 @@ void gshare_cleanup_predictor() {
  *  @param sim_stats Pointer to the simulation statistics -- update in this function
 */
 void branchsim_update_stats(bool prediction, branch_t *br, branchsim_stats_t *sim_stats) {
+    // Increment the total number of branch instructions
+    sim_stats->num_branch_instructions++;
 
+    // Update counters for correct predictions and mispredictions
+    if (prediction == br->is_taken) {
+        sim_stats->num_branches_correctly_predicted++;
+    } else {
+        sim_stats->num_branches_mispredicted++;
+    }
 }
 
 /**
@@ -121,7 +153,12 @@ void branchsim_update_stats(bool prediction, branch_t *br, branchsim_stats_t *si
  *  @param sim_stats Pointer to the simulation statistics -- update in this function
 */
 void branchsim_finish_stats(branchsim_stats_t *sim_stats) {
-
+    // Calculate misprediction rate
+    if (sim_stats->num_branch_instructions > 0) {
+        sim_stats->prediction_accuracy = 100.0 * sim_stats->num_branches_mispredicted / sim_stats->num_branch_instructions;
+    } else {
+        sim_stats->prediction_accuracy = 0.0; // To handle the case where no branch instructions were encountered
+    }
 }
 
 
