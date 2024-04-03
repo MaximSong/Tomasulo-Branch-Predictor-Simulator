@@ -3,4 +3,7 @@ ref_outs/
 traces/
 *.sh
 *.pdf
+*.d
+*.o
+*.out
 Makefile

@@ -1,0 +1,1 @@
+./proj2sim -i traces/deepsjeng531_50K.trace -x -b 3 -p 13
