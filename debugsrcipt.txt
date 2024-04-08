@@ -1,1 +1,1 @@
-./proj2sim -i traces/deepsjeng531_50K.trace -x -b 3 -p 13
+./proj2sim -i traces/leela541_50K.trace -b 3 -p 15 -s 5 -a 3 -m 2 -l 2 -f 4 -d >output.txt

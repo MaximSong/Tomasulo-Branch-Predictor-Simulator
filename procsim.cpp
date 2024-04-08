@@ -15,8 +15,39 @@
 //
 // TODO: Define any useful data structures and functions here
 //
-
-
+enum fu_type {
+    ALU,
+    MUL,
+    LSU
+};
+struct fu_t {
+    fu_type type;
+    bool busy;
+    inst_t *inst;
+};
+struct rob_entry_t {
+    inst_t inst;
+    bool completed;
+};
+struct register_file_entry_t {
+    uint64_t tag;
+    bool ready;
+};
+struct mat_entry_t {
+    uint64_t tag;
+    bool ready;
+};
+struct reservation_station_entry_t {
+    inst_t *inst;
+    bool operands_ready;
+    bool occupied;
+};
+std::vector<fu_t> fus;
+std::vector<rob_entry_t> rob;
+std::vector<inst_t*> dispatch_queue;
+std::vector<reservation_station_entry_t> scheduling_queue;
+register_file_entry_t messy_rf[NUM_REGS];
+mat_entry_t mat[NUM_MATS];
 // The helper functions in this#ifdef are optional and included here for your
 // convenience so you can spend more time writing your simulator logic and less
 // time trying to match debug trace formatting! (If you choose to use them)
@@ -197,9 +228,52 @@ static void stage_fetch(procsim_stats_t *stats) {
 // state, and statistics.
 void procsim_init(const procsim_conf_t *sim_conf, procsim_stats_t *stats) {
     // TODO: fill me in
+    // Initialize stats
+    memset(stats, 0, sizeof(procsim_stats_t));
 
+    // Initialize the Functional Units (FUs)
+    size_t total_fus = sim_conf->num_alu_fus + sim_conf->num_mul_fus + sim_conf->num_lsu_fus;
+    fus.reserve(total_fus);
+    for (size_t i = 0; i < sim_conf->num_alu_fus; i++) {
+        fus.push_back({ALU, false, nullptr});
+    }
+    for (size_t i = 0; i < sim_conf->num_mul_fus; i++) {
+        fus.push_back({MUL, false, nullptr});
+    }
+    for (size_t i = 0; i < sim_conf->num_lsu_fus; i++) {
+        fus.push_back({LSU, false, nullptr});
+    }
+
+    // Initialize the Reorder Buffer (ROB)
+    rob.reserve(sim_conf->num_rob_entries);
+    for (size_t i = 0; i < sim_conf->num_rob_entries; i++) {
+        rob.push_back({.completed = false});
+    }
+
+    // Initialize the Register File (RF)
+    for (int i = 0; i < NUM_REGS; i++) {
+        messy_rf[i].tag = i;
+        messy_rf[i].ready = true;
+    }
+
+    // Initialize the Memory Alias Table (MAT)
+    for (int i = 0; i < NUM_MATS; i++) {
+        mat[i].tag = 32 + i; // Starting from 32 as per project description
+        mat[i].ready = true;
+    }
+
+    // Initialize the Dispatch Queue
+    // The size of the dispatch queue is the same as the number of ROB entries
+    dispatch_queue.reserve(sim_conf->num_rob_entries);
+
+    // Initialize the Scheduling Queue
+    size_t schedq_size = sim_conf->num_schedq_entries_per_fu * (sim_conf->num_alu_fus + sim_conf->num_mul_fus + sim_conf->num_lsu_fus);
+    scheduling_queue.reserve(schedq_size);
+    for (size_t i = 0; i < schedq_size; i++) {
+        scheduling_queue.push_back({.occupied = false});
+    }    
 #ifdef DEBUG
-    printf("\nScheduling queue capacity: %lu instructions\n", 0lu); // TODO: Fix Me
+    printf("\nScheduling queue capacity: %lu instructions\n", scheduling_queue.size()); // TODO: Fix Me
     printf("\n"); //  PROVIDED
 #endif
 }

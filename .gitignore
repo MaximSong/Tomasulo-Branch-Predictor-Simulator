@@ -6,4 +6,5 @@ traces/
 *.d
 *.o
 *.out
+*.txt
 Makefile
